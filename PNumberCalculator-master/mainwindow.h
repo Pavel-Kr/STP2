@@ -3,7 +3,9 @@
 
 #include <QMainWindow>
 #include <QString>
+#include <unordered_map>
 #include "tpnumber.h"
+#include "calculator.h"
 
 namespace Ui {
 class MainWindow;
@@ -30,7 +32,9 @@ public:
 public slots:
     void set_buttons(int base);
 
+
 private:
+    Calculator worker;
     Ui::MainWindow *ui;
     std::string story;
     std::string log;

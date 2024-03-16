@@ -60,6 +60,52 @@ void MainWindow::story_add(string new_text)
     story = story + "\n" + new_text;
 }
 
+bool is_operator(char c)
+{
+    if (c == '+' || c == '-' || c == '*' || c == '/' || c == '(' || c == ')' || c == '^')
+        return true;
+    return false;
+}
+
+void MainWindow::btn_reverse_click()
+{
+    string input_text = ui->le_input->text().toStdString();
+    int id_new_minus = -1;
+    for (int i = input_text.size()-1; i>=0; --i)
+    {
+        if(is_operator(input_text[i]) && input_text[i] != '(' && input_text[i] != ')')
+        {
+            if(input_text[i] == '-')
+            {
+                input_text[i] = '+';
+                ui->le_input->setText(QString::fromStdString(input_text));
+                return;
+            }
+            else if(input_text[i] == '+')
+            {
+                input_text[i] = '-';
+                ui->le_input->setText(QString::fromStdString(input_text));
+                return;
+            }
+            else
+            {
+                id_new_minus = i;
+                break;
+            }
+        }
+    }
+    if(id_new_minus == -1)
+    {
+        ui->le_input->setText(QString::fromStdString("-" + input_text));
+        return;
+    }
+    string left = input_text.substr(0, id_new_minus+1);
+    string right = input_text.substr(id_new_minus+1, input_text.size() - id_new_minus);
+    left+="(-";
+    right+=")";
+    ui->le_input->setText(QString::fromStdString(left + right));
+}
+
 void MainWindow::btn_execute_click()
 {
     //a+b*c
@@ -74,25 +120,101 @@ void MainWindow::btn_execute_click()
 
     string input_text = ui->le_input->text().toStdString();
 
+    string temp_str = "";
+    string calc_str = "";
+
+    /*
+             * 1 парсим число в 16
+             * 2 перевод в 10
+             * 3 зпрись в calc_str числа и знака
+             * 4 повторить пока есть числа и знаки
+             * 5 отправить в калькулятор
+             * 6 перевести результат в res_base
+             */
     cout << "_\n";
-    string str_res = "";
-    if(input_text.size() != 0)
+    bool error = false;
+    char old_i = '~';
+    for(auto &i : input_text)
     {
-        TPNumber pnum(input_text, base.toStdString(), to_string(tocnost));
-        story_add("Вase " + base.toStdString() + ": number = " + input_text);
-        pnum.setBase(res_base.toStdString());
-        story_add("Вase " + res_base.toStdString() + ": number = " + pnum.getNumberString());
-        str_res = pnum.getNumberString();
-        input_text = "";
+        if ((i == '+' && old_i == '~') || (i == '+' && old_i == '('))
+        {
+            calc_str += "0+";
+            old_i = i;
+        }
+        else if ((i == '-' && old_i == '~') || (i == '-' && old_i == '('))
+        {
+            calc_str += "0-";
+            old_i = i;
+        }
+        else if (is_operator(i))
+        {
+            if(temp_str.size() != 0)
+            {
+
+                TPNumber pnum(temp_str, base.toStdString(), to_string(tocnost));
+                story_add("В " + base.toStdString() + ": temp str = " + temp_str + "; calc_str += " + pnum.getNumberString());
+                pnum.setBase(10);
+                story_add("В 10: temp str = " + temp_str + "; calc_str += " + pnum.getNumberString());
+                calc_str += pnum.getNumberString();
+                temp_str = "";
+                if (!pnum.isCorrect)
+                    error = true;
+            }
+            calc_str += i;
+            old_i = i;
+        }
+        else if(!is_operator(i))
+        {
+            temp_str += i;
+            old_i = i;
+        }
+    }
+    if(temp_str.size() != 0)
+    {
+        TPNumber pnum(temp_str, base.toStdString(), to_string(tocnost));
+        story_add("В " + base.toStdString() + ": temp str = " + temp_str + "; calc_str += " + pnum.getNumberString());
+        pnum.setBase(10);
+        story_add("В 10: temp str = " + temp_str + "; calc_str += " + pnum.getNumberString());
+        calc_str += pnum.getNumberString();
+        temp_str = "";
+        if (!pnum.isCorrect)
+            error = true;
     }
 
-    if (str_res.find(".") != string::npos){
-        while(str_res.back() == '0')
-            str_res.pop_back();
-        if (str_res.back() == '.')
-            str_res.pop_back();
+    double result = worker.run(calc_str);
+    string str_res = to_string(result);
+    while(str_res[str_res.size()-1] == '0')
+        str_res.resize(str_res.size()-1);
+    if(str_res[str_res.size()-1] == '.')
+        str_res.resize(str_res.size()-1);
+    for(size_t i = 0; i < str_res.size(); ++i)
+    {
+        if(str_res[i] == '.')
+            tocnost = str_res.size() - i;
     }
-    ui->le_output->setText(QString::fromStdString(str_res));
+
+
+    cout << "str_res = " << str_res << ";\n";
+    TPNumber pnum(str_res, "10", to_string(tocnost));
+
+    pnum.setBase(res_base.toStdString());
+    if (!pnum.isCorrect || worker.error_brackets)
+        error = true;
+    string res = pnum.getNumberString();
+    if (error || worker.error0)
+        res = "Error";
+    story_add("result = " + res);
+    if (res.find('.') != string::npos){
+        while(res[res.size()-1] == '0')
+            res.resize(res.size()-1);
+        if(res[res.size()-1] == '.')
+            res.resize(res.size()-1);
+        if(res[0] == '.')
+            res = "0" + res;
+    }
+    ui->le_output->setText(QString::fromStdString(res));
+    if (pnum.isCorrect)
+        story+= to_string(result) + "(" + base.toStdString() + ") = " + res + "(" + res_base.toStdString() + ")\n";
 }
 
 void MainWindow::set_buttons(int base){
@@ -180,6 +302,16 @@ MainWindow::MainWindow(QWidget *parent) :
     connect(ui->btn_d, &QPushButton::clicked, this, [this](){this->btn_input_click("D");});
     connect(ui->btn_e, &QPushButton::clicked, this, [this](){this->btn_input_click("E");});
     connect(ui->btn_f, &QPushButton::clicked, this, [this](){this->btn_input_click("F");});
+    connect(ui->btn_plus, &QPushButton::clicked, this, [this](){this->btn_input_click("+");});
+    connect(ui->btn_minus, &QPushButton::clicked, this, [this](){this->btn_input_click("-");});
+    connect(ui->btn_multiple, &QPushButton::clicked, this, [this](){this->btn_input_click("*");});
+    connect(ui->btn_divide, &QPushButton::clicked, this, [this](){this->btn_input_click("/");});
+    connect(ui->btn_pow, &QPushButton::clicked, this, [this](){this->btn_input_click("^");});
+    connect(ui->btn_sqrt, &QPushButton::clicked, this, [this](){this->btn_input_click("^(1/2)");});
+    connect(ui->btn_percent, &QPushButton::clicked, this, [this](){this->btn_input_click("/100");});
+    connect(ui->btn_brackets_1, &QPushButton::clicked, this, [this](){this->btn_input_click("(");});
+    connect(ui->btn_brackets_2, &QPushButton::clicked, this, [this](){this->btn_input_click(")");});
+    connect(ui->btn_reverse, &QPushButton::clicked, this, [this](){this->btn_reverse_click();});
     connect(ui->btn_point, &QPushButton::clicked, this, [this](){this->btn_input_click(".");});
     connect(ui->btn_delete, &QPushButton::clicked, this, [this](){this->btn_delete_click();});
     connect(ui->btn_clear, &QPushButton::clicked, this, [this](){this->btn_clear_click();});

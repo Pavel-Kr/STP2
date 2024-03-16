@@ -26,13 +26,13 @@ DEFINES += QT_DEPRECATED_WARNINGS
 SOURCES += \
         main.cpp \
         mainwindow.cpp \
-    tpnumber.cpp
+    tpnumber.cpp \
+    calculator.cpp
 
 HEADERS += \
         mainwindow.h \
-    tpnumber.h
+    tpnumber.h \
+    calculator.h
 
 FORMS += \
         mainwindow.ui
-
-DISTFILES +=
